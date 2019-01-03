@@ -1,0 +1,8 @@
+---
+name: "import"
+version: "0.1.0"
+usage: "Please see https://github.com/k-kinzal/helm-import"
+description: "Import Helm Chart where only public code into local repository."
+command: "$HELM_PLUGIN_DIR/import"
+hooks:
+  install: "$HELM_PLUGIN_DIR/install-binary.sh"
