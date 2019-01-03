@@ -1,4 +1,5 @@
 # Helm Import Plugin
+[![Go Report Card](https://goreportcard.com/badge/github.com/k-kinzal/helm-import)](https://goreportcard.com/report/github.com/k-kinzal/helm-import)
 
 Import Helm Chart where only public code into local repository.
 
@@ -22,9 +23,9 @@ $ helm import URL
 
 ## URL Patterns
 
-* https://example.com/path/to/file.tgz
-* helm import https://github.com/user/repo/
-* helm import https://github.com/user/repo/tree/branch
-* helm import https://github.com/user/repo/tree/branch/path/to
+* `https://example.com/path/to/file.tgz`
+* `https://github.com/user/repo/`
+* `https://github.com/user/repo/tree/branch`
+* `https://github.com/user/repo/tree/branch/path/to`
 
 helm-import supports these URL patterns.
