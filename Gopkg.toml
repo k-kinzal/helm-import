@@ -26,6 +26,10 @@
 
 
 [[constraint]]
+  name = "github.com/cavaliercoder/grab"
+  version = "2.0.0"
+
+[[constraint]]
   name = "github.com/spf13/cobra"
   version = "0.0.3"
 

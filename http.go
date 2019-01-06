@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"k8s.io/helm/pkg/repo"
-	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"time"
+
+	"github.com/cavaliercoder/grab"
 )
 
 func httpDownload(url url.URL) (*string, error) {
@@ -23,25 +24,40 @@ func httpDownload(url url.URL) (*string, error) {
 	if _, err := os.Stat(filepath); err == nil {
 		return &filepath, nil
 	}
+	client := grab.NewClient()
+	req, _ := grab.NewRequest(filepath, url.String())
 
-	out, err := os.Create(filepath)
-	if err != nil {
-		return nil, err
+	fmt.Fprintf(os.Stderr, "Downloading %v...\n", req.URL())
+	resp := client.Do(req)
+
+	t := time.NewTicker(500 * time.Millisecond)
+	defer t.Stop()
+
+Loop:
+	for {
+		select {
+		case <-t.C:
+			fmt.Fprintf(os.Stderr, "  transferred %v / %v bytes (%.2f%%)\n",
+				resp.BytesComplete(),
+				resp.Size,
+				100*resp.Progress())
+
+		case <-resp.Done:
+			fmt.Fprintf(os.Stderr, "  transferred %v / %v bytes (%.2f%%)\n",
+				resp.BytesComplete(),
+				resp.Size,
+				100*resp.Progress())
+			break Loop
+		}
 	}
-	defer out.Close()
 
-	resp, err := http.Get(url.String())
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return nil, err
+	if err := resp.Err(); err != nil {
+		return nil, fmt.Errorf("Download failed: %v\n", err)
 	}
 
-	return &filepath, nil
+	fmt.Fprintf(os.Stderr, "Download saved to %v \n", resp.Filename)
+
+	return &resp.Filename, nil
 }
 
 func HttpImport(url url.URL) error {
