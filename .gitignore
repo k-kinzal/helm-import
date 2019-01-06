@@ -17,6 +17,7 @@
 
 # Distribute binary
 /dist/
+import
 
 ### Go Patch ###
 /vendor/
