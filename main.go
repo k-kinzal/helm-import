@@ -24,6 +24,8 @@ func newRootCmd() *cobra.Command {
 			}
 			return Import(*u)
 		},
+		SilenceErrors: true,
+		SilenceUsage: true,
 	}
 	cmd.SetUsageTemplate(`Usage:{{if .Runnable}}
   helm import URL{{end}}{{if .HasAvailableSubCommands}}

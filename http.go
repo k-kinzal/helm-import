@@ -5,24 +5,24 @@ import (
 	"io"
 	"io/ioutil"
 	"k8s.io/helm/pkg/repo"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
 )
 
-func HttpDownload(url url.URL) (*string, error) {
-	tmpdir, err := ioutil.TempDir("", "*")
-	if err != nil {
-		log.Fatal(err)
+func httpDownload(url url.URL) (*string, error) {
+	cacheDir := HelmEnv.Home.Path("cache", "import", url.Host, path.Dir(url.Path))
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			return nil, fmt.Errorf("%s: not create cache dir", cacheDir)
+		}
 	}
+	filepath := path.Join(cacheDir, path.Base(url.Path))
 
-	tmpfile, err := ioutil.TempFile(tmpdir, "*.tgz")
-	if err != nil {
-		log.Fatal(err)
+	if _, err := os.Stat(filepath); err == nil {
+		return &filepath, nil
 	}
-	filepath := tmpfile.Name()
 
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -45,34 +45,39 @@ func HttpDownload(url url.URL) (*string, error) {
 }
 
 func HttpImport(url url.URL) error {
-	filepath, err := HttpDownload(url)
+	filepath, err := httpDownload(url)
 	if err != nil {
 		return err
 	}
 
-	i1, err := repo.LoadIndexFile(HelmEnv.Home.LocalRepository("index.yaml"))
+	tmpdir, err := ioutil.TempDir("", "*")
 	if err != nil {
 		return err
 	}
 
-	i2, err := repo.IndexDirectory(path.Dir(*filepath), Env.BaseUrl)
+	if err := copy(*filepath, path.Join(tmpdir, path.Base(*filepath))); err != nil {
+		return err
+	}
+
+	idx, err := repo.IndexDirectory(path.Join(tmpdir), Env.BaseUrl)
 	if err != nil {
 		return err
 	}
-	for name, versions := range i2.Entries {
-		for index, version := range versions {
+
+	for _, versions := range idx.Entries {
+		for _, version := range versions {
 			filename := fmt.Sprintf("%s-%s.tgz", version.Name, version.Version)
 			if err := copy(*filepath, HelmEnv.Home.LocalRepository(filename)); err != nil {
 				return err
 			}
-
-			version.URLs[0] = fmt.Sprintf("%s/%s", Env.BaseUrl, filename)
-			versions[index] = version
 		}
-		i2.Entries[name] = versions
 	}
 
-	i1.Merge(i2)
 
-	return i1.WriteFile(HelmEnv.Home.LocalRepository("index.yaml"), 0644)
+	index, err := repo.IndexDirectory(HelmEnv.Home.LocalRepository(), Env.BaseUrl)
+	if err != nil {
+		return err
+	}
+
+	return index.WriteFile(HelmEnv.Home.LocalRepository("index.yaml"), 0644)
 }
