@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"k8s.io/helm/pkg/chartutil"
 	"k8s.io/helm/pkg/repo"
 	"net/url"
@@ -13,13 +12,17 @@ import (
 	"gopkg.in/src-d/go-git.v4"
 )
 
-func GithubImport(url url.URL) error {
+func gitDownload(url url.URL) (*string, error) {
 	s := strings.Split(strings.Trim(url.Path, "/"), "/")
 	if len(s) < 2 { // user/repo
-		return fmt.Errorf("%s: is not Github repository URL", url.String())
+		return nil, fmt.Errorf("%s: is not Github repository URL", url.String())
 	}
 
-	repoUrl := fmt.Sprintf("%s://%s/%s", url.Scheme, url.Host, strings.Join(s[0:2], "/"))
+	repoUrl, err := url.Parse(fmt.Sprintf("%s://%s/%s", url.Scheme, url.Host, strings.Join(s[0:2], "/")))
+	if err != nil {
+		return nil, err
+	}
+
 	branch := "master"
 	if len(s) >= 4 { // /user/repo/tree/branch
 		branch = s[3]
@@ -29,24 +32,46 @@ func GithubImport(url url.URL) error {
 		pathChart = fmt.Sprintf("/%s", strings.Join(s[4:], "/"))
 	}
 
-	tmpdir, err := ioutil.TempDir("", "*")
-	if err != nil {
-		return err
+	cacheDir := HelmEnv.Home.Path("cache", "import", repoUrl.Host, repoUrl.Path)
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			return nil, fmt.Errorf("%s: not create cache dir", cacheDir)
+		}
 	}
 
-	repository, err := git.PlainClone(tmpdir, false, &git.CloneOptions{
-		URL:      repoUrl,
-		Progress: os.Stderr,
-	})
+	repository, err := git.PlainOpen(cacheDir)
 	if err != nil {
-		return err
+		repository, err = git.PlainClone(cacheDir, false, &git.CloneOptions{
+			URL:      repoUrl.String(),
+			Progress: os.Stderr,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if _, err := repository.Branch(branch); err != nil {
+		return nil, err
+	}
+
+	if err := repository.Fetch(&git.FetchOptions{Progress: os.Stderr, Force: true}); err != nil {
+		if err.Error() != "already up-to-date" {
+			return nil, err
+		}
+	}
+
+	dirpath := path.Join(cacheDir, pathChart)
+
+	return &dirpath, nil
+}
+
+func GithubImport(url url.URL) error {
+	dirpath, err := gitDownload(url)
+	if err != nil {
 		return err
 	}
 
-	ch, err := chartutil.LoadDir(path.Join(tmpdir, pathChart))
+	ch, err := chartutil.LoadDir(*dirpath)
 	if err != nil {
 		return err
 	}
