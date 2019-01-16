@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func gitDownload(url url.URL) (*string, error) {
@@ -50,14 +51,29 @@ func gitDownload(url url.URL) (*string, error) {
 		}
 	}
 
-	if _, err := repository.Branch(branch); err != nil {
-		return nil, err
-	}
-
-	if err := repository.Fetch(&git.FetchOptions{Progress: os.Stderr, Force: true}); err != nil {
+	if err := repository.Fetch(&git.FetchOptions{Progress: os.Stderr, Force: true, Tags: git.AllTags}); err != nil {
 		if err.Error() != "already up-to-date" {
 			return nil, err
 		}
+	}
+
+	var ref plumbing.ReferenceName
+	if b, err := repository.Branch(branch); err == nil {
+		ref = b.Merge
+	} else {
+		r, err :=  repository.Tag(branch)
+		if err != nil {
+			return nil, fmt.Errorf("%s: branch and tag not found", branch)
+		}
+		ref = r.Name()
+	}
+
+	tree, err := repository.Worktree()
+	if err != nil {
+		return nil, err
+	}
+	if err := tree.Checkout(&git.CheckoutOptions{ Branch: ref }); err != nil {
+		return nil, err
 	}
 
 	dirpath := path.Join(cacheDir, pathChart)
