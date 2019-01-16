@@ -61,7 +61,7 @@ func gitDownload(url url.URL) (*string, error) {
 	if b, err := repository.Branch(branch); err == nil {
 		ref = b.Merge
 	} else {
-		r, err :=  repository.Tag(branch)
+		r, err := repository.Tag(branch)
 		if err != nil {
 			return nil, fmt.Errorf("%s: branch and tag not found", branch)
 		}
@@ -72,7 +72,7 @@ func gitDownload(url url.URL) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := tree.Checkout(&git.CheckoutOptions{ Branch: ref }); err != nil {
+	if err := tree.Checkout(&git.CheckoutOptions{Branch: ref}); err != nil {
 		return nil, err
 	}
 

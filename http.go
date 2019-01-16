@@ -89,7 +89,6 @@ func HttpImport(url url.URL) error {
 		}
 	}
 
-
 	index, err := repo.IndexDirectory(HelmEnv.Home.LocalRepository(), Env.BaseUrl)
 	if err != nil {
 		return err
